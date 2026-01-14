@@ -1,21 +1,34 @@
-import { Request, Response, NextFunction } from 'express';
+import { Request, Response, NextFunction } from "express";
 
-const VALID_API_KEY = process.env.POS_API_KEY || 'dev-api-key-12345';
+export function apiKeyAuth(
+  req: Request,
+  res: Response,
+  next: NextFunction
+) {
+  const providedKey =
+    req.headers["x-pos-api-key"] as string | undefined;
 
-export function apiKeyAuth(req: Request, res: Response, next: NextFunction) {
-  const apiKey = req.headers['x-pos-api-key'];
+  const validKey = process.env.POS_API_KEY;
 
-  if (!apiKey) {
+  if (!providedKey) {
     return res.status(401).json({
       success: false,
-      error: 'Missing X-POS-API-KEY header',
+      error: "Missing X-POS-API-KEY header",
     });
   }
 
-  if (apiKey !== VALID_API_KEY) {
+  if (!validKey) {
+    console.error("POS_API_KEY is not set in environment");
+    return res.status(500).json({
+      success: false,
+      error: "POS API key not configured",
+    });
+  }
+
+  if (providedKey !== validKey) {
     return res.status(403).json({
       success: false,
-      error: 'Invalid API key',
+      error: "Invalid POS API key",
     });
   }
 
