@@ -3,6 +3,9 @@ import cors from 'cors';
 import v1Router from './api/v1/index';
 import { apiKeyAuth } from './middleware/auth';
 
+// DEBUG: Check what PORT we're getting from environment
+console.log("ENV PORT =", process.env.PORT);
+
 // Create Express app
 const app = express();
 
@@ -40,8 +43,11 @@ app.use((err: any, req: Request, res: Response, next: NextFunction) => {
 });
 
 // Start server
-const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => {
+const PORT = Number(process.env.PORT) || 3000;
+
+console.log("FINAL PORT USED =", PORT);
+
+app.listen(PORT, "0.0.0.0", () => {
   console.log(`🚀 POS Simulator running on port ${PORT}`);
   console.log(`📍 API: http://localhost:${PORT}/api/v1`);
   console.log(`🔑 API Key: ${process.env.POS_API_KEY || 'dev-api-key-12345'}`);
