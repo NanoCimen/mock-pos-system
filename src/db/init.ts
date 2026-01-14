@@ -1,10 +1,6 @@
 import pool from './connection';
 import { readFileSync } from 'fs';
-import { fileURLToPath } from 'url';
-import { dirname, join } from 'path';
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = dirname(__filename);
+import path from 'path';
 
 async function initDatabase() {
   const client = await pool.connect();
@@ -12,8 +8,8 @@ async function initDatabase() {
   try {
     console.log('🗄️  Initializing database...');
     
-    // Read and execute schema
-    const schemaPath = join(__dirname, 'schema.sql');
+    // Read and execute schema - use path relative to current file
+    const schemaPath = path.join(__dirname, 'schema.sql');
     const schema = readFileSync(schemaPath, 'utf8');
     
     await client.query(schema);
@@ -33,11 +29,12 @@ async function initDatabase() {
     throw error;
   } finally {
     client.release();
+    await pool.end();
   }
 }
 
 // Run init if called directly
-if (import.meta.url === `file://${process.argv[1]}`) {
+if (require.main === module) {
   initDatabase()
     .then(() => {
       console.log('✅ Init completed');
