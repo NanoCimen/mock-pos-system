@@ -10,12 +10,16 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
-// Health check endpoint (no auth required)
+// Health check endpoints (no auth required) - must be before API routes
 app.get('/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
 
-// API v1 routes (with auth)
+app.get('/api/v1/health', (req, res) => {
+  res.json({ status: 'ok', timestamp: new Date().toISOString() });
+});
+
+// API v1 routes (with auth) - mounted after health checks
 app.use('/api/v1', apiKeyAuth, v1Router);
 
 // 404 handler

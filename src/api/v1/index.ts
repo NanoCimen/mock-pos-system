@@ -7,6 +7,11 @@ import pool from '../../db/connection.js';
 
 const router = Router();
 
+// GET /api/v1/health - Health check (for Railway)
+router.get('/health', (req, res) => {
+  res.json({ status: 'ok', timestamp: new Date().toISOString() });
+});
+
 // GET /api/v1/capabilities - POS capabilities
 router.get('/capabilities', async (req, res) => {
   try {
