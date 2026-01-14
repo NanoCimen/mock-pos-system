@@ -1,9 +1,9 @@
 import { Router } from 'express';
-import ticketsRouter from './tickets.js';
-import itemsRouter from './items.js';
-import paymentsRouter from './payments.js';
-import { PosCapabilities } from '../../types/index.js';
-import pool from '../../db/connection.js';
+import ticketsRouter from './tickets';
+import itemsRouter from './items';
+import paymentsRouter from './payments';
+import { PosCapabilities } from '../../types/index';
+import pool from '../../db/connection';
 
 const router = Router();
 

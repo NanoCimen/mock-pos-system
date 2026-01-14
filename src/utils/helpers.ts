@@ -1,4 +1,4 @@
-import { TicketItem } from '../types/index.js';
+import { TicketItem } from '../types/index';
 
 // Generate unique IDs
 export function generateId(prefix: string): string {

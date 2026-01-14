@@ -1,7 +1,7 @@
-import express from 'express';
+import express, { Request, Response, NextFunction } from 'express';
 import cors from 'cors';
-import v1Router from './api/v1/index.js';
-import { apiKeyAuth } from './middleware/auth.js';
+import v1Router from './api/v1/index';
+import { apiKeyAuth } from './middleware/auth';
 
 // Create Express app
 const app = express();
@@ -11,11 +11,11 @@ app.use(cors());
 app.use(express.json());
 
 // Health check endpoints (no auth required) - must be before API routes
-app.get('/health', (req, res) => {
+app.get('/health', (_req: Request, res: Response) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
 
-app.get('/api/v1/health', (req, res) => {
+app.get('/api/v1/health', (_req: Request, res: Response) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
 
@@ -31,7 +31,7 @@ app.use((req, res) => {
 });
 
 // Error handler
-app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
+app.use((err: any, req: Request, res: Response, next: NextFunction) => {
   console.error('Unhandled error:', err);
   res.status(500).json({
     success: false,

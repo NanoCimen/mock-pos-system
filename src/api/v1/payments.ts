@@ -1,7 +1,7 @@
 import { Router } from 'express';
-import pool from '../../db/connection.js';
-import { Payment, TicketItem, CreatePaymentRequest } from '../../types/index.js';
-import { generateId, determineItemStatus, determineTicketStatus, shouldSimulateFailure, simulateDelay } from '../../utils/helpers.js';
+import pool from '../../db/connection';
+import { Payment, TicketItem, CreatePaymentRequest } from '../../types/index';
+import { generateId, determineItemStatus, determineTicketStatus, shouldSimulateFailure, simulateDelay } from '../../utils/helpers';
 
 const router = Router();
 
