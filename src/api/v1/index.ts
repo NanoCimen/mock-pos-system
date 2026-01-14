@@ -2,8 +2,6 @@ import { Router } from 'express';
 import ticketsRouter from './tickets';
 import itemsRouter from './items';
 import paymentsRouter from './payments';
-import { PosCapabilities } from '../../types/index';
-import pool from '../../db/connection';
 
 const router = Router();
 
@@ -12,31 +10,18 @@ router.get('/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
 
-// GET /api/v1/capabilities - POS capabilities
-router.get('/capabilities', async (req, res) => {
-  try {
-    const result = await pool.query('SELECT * FROM pos_config LIMIT 1');
-    const config = result.rows[0];
-
-    const capabilities: PosCapabilities = {
+// GET /api/v1/capabilities - POS capabilities (NO DATABASE - static response)
+router.get('/capabilities', (_req, res) => {
+  return res.json({
+    success: true,
+    data: {
       supportsPartialPayments: true,
       supportsItemLocking: false,
       supportsWebhooks: false,
       supportsRefunds: false,
-      currency: [config?.currency || 'DOP'],
-    };
-
-    return res.json({
-      success: true,
-      data: capabilities,
-    });
-  } catch (error: any) {
-    console.error('Error fetching capabilities:', error);
-    return res.status(500).json({
-      success: false,
-      error: error.message,
-    });
-  }
+      currency: ['DOP'],
+    },
+  });
 });
 
 // Mount sub-routers
