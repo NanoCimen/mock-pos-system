@@ -1,15 +1,46 @@
-import * as admin from 'firebase-admin';
-import * as functions from 'firebase-functions';
-import * as express from 'express';
-import apiRouter from './api/router';
-
-// Initialize Firebase Admin
-admin.initializeApp();
+import express from 'express';
+import cors from 'cors';
+import v1Router from './api/v1/index.js';
+import { apiKeyAuth } from './middleware/auth.js';
 
 // Create Express app
 const app = express();
-app.use('/', apiRouter);
 
-// Export single API function
-export const api = functions.https.onRequest(app);
+// Middleware
+app.use(cors());
+app.use(express.json());
 
+// Health check endpoint (no auth required)
+app.get('/health', (req, res) => {
+  res.json({ status: 'ok', timestamp: new Date().toISOString() });
+});
+
+// API v1 routes (with auth)
+app.use('/api/v1', apiKeyAuth, v1Router);
+
+// 404 handler
+app.use((req, res) => {
+  res.status(404).json({
+    success: false,
+    error: 'Endpoint not found',
+  });
+});
+
+// Error handler
+app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
+  console.error('Unhandled error:', err);
+  res.status(500).json({
+    success: false,
+    error: 'Internal server error',
+  });
+});
+
+// Start server
+const PORT = process.env.PORT || 3000;
+app.listen(PORT, () => {
+  console.log(`🚀 POS Simulator running on port ${PORT}`);
+  console.log(`📍 API: http://localhost:${PORT}/api/v1`);
+  console.log(`🔑 API Key: ${process.env.POS_API_KEY || 'dev-api-key-12345'}`);
+  console.log(`⚡ Simulated delay: ${process.env.SIMULATED_DELAY_MS || 0}ms`);
+  console.log(`💥 Failure rate: ${parseFloat(process.env.FAILURE_RATE || '0') * 100}%`);
+});

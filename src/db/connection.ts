@@ -3,9 +3,14 @@ import dotenv from 'dotenv';
 
 dotenv.config();
 
+// Determine if we need SSL (typically for cloud databases)
+const useSSL = process.env.DATABASE_URL?.includes('amazonaws.com') || 
+               process.env.DATABASE_URL?.includes('supabase.co') ||
+               process.env.USE_SSL === 'true';
+
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
-  ssl: { rejectUnauthorized: false },
+  ssl: useSSL ? { rejectUnauthorized: false } : false,
 });
 
 // Test connection
