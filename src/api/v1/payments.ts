@@ -160,7 +160,16 @@ router.post('/', async (req: Request, res: Response) => {
         status
       )
       VALUES ($1, $2, $3, $4, $5, $6, 'CONFIRMED')
-      RETURNING *`,
+      RETURNING 
+        payments.id,
+        payments.ticket_id,
+        payments.external_payment_id,
+        payments.external_provider,
+        payments.method,
+        payments.amount,
+        payments.currency,
+        payments.status,
+        payments.created_at`,
       [externalPaymentId, externalProvider, methodUpper, ticketId, amount, ticket.currency || 'DOP']
     );
 
@@ -182,7 +191,7 @@ router.post('/', async (req: Request, res: Response) => {
 
       // Update ticket_item paid_amount (sum of all payment_items for this ticket_item)
       const paidAmountResult = await client.query(
-        `SELECT COALESCE(SUM(amount), 0) as total_paid
+        `SELECT COALESCE(SUM(pi.amount), 0) as total_paid
          FROM payment_items pi
          JOIN payments p ON pi.payment_id = p.id
          WHERE pi.ticket_item_id = $1 AND p.status = 'CONFIRMED'`,
@@ -197,16 +206,20 @@ router.post('/', async (req: Request, res: Response) => {
       await client.query(
         `UPDATE ticket_items 
          SET paid_amount = $1 
-         WHERE id = $2`,
+         WHERE ticket_items.id = $2`,
         [totalPaid, paymentItem.ticketItemId]
       );
     }
 
     // Update ticket status based on all items
     const allItemsResult = await client.query(
-      `SELECT *, (price * quantity) as total_price 
+      `SELECT 
+        ticket_items.paid_amount,
+        ticket_items.price,
+        ticket_items.quantity,
+        (ticket_items.price * ticket_items.quantity) as total_price 
        FROM ticket_items 
-       WHERE ticket_id = $1`,
+       WHERE ticket_items.ticket_id = $1`,
       [ticketId]
     );
 
@@ -221,7 +234,10 @@ router.post('/', async (req: Request, res: Response) => {
     }
 
     await client.query(
-      `UPDATE tickets SET status = $1, updated_at = NOW() WHERE id = $2`,
+      `UPDATE tickets 
+       SET status = $1, 
+           updated_at = NOW() 
+       WHERE tickets.id = $2`,
       [newStatus, ticketId]
     );
 
@@ -286,7 +302,7 @@ router.get('/', async (req: Request, res: Response) => {
     }
 
     const result = await pool.query(
-      'SELECT * FROM payments WHERE ticket_id = $1 ORDER BY created_at DESC',
+      'SELECT * FROM payments WHERE payments.ticket_id = $1 ORDER BY payments.created_at DESC',
       [ticketId]
     );
 
@@ -294,7 +310,13 @@ router.get('/', async (req: Request, res: Response) => {
     const payments: any[] = [];
     for (const row of result.rows) {
       const itemsResult = await pool.query(
-        `SELECT pi.*, ti.name as item_name
+        `SELECT 
+          pi.id,
+          pi.payment_id,
+          pi.ticket_item_id,
+          pi.amount,
+          pi.quantity,
+          ti.name as item_name
          FROM payment_items pi
          JOIN ticket_items ti ON pi.ticket_item_id = ti.id
          WHERE pi.payment_id = $1`,

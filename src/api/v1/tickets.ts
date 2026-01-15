@@ -23,15 +23,15 @@ router.get('/', async (req: Request, res: Response) => {
     let paramIndex = 1;
 
     if (status) {
-      query += ` AND status = $${paramIndex++}`;
+      query += ` AND tickets.status = $${paramIndex++}`;
       params.push(status);
     }
     if (mesaId) {
-      query += ` AND mesa_id = $${paramIndex++}`;
+      query += ` AND tickets.mesa_id = $${paramIndex++}`;
       params.push(mesaId);
     }
 
-    query += ' ORDER BY created_at DESC';
+    query += ' ORDER BY tickets.created_at DESC';
 
     const result = await pool.query(query, params);
     const tickets: Ticket[] = [];
@@ -40,16 +40,16 @@ router.get('/', async (req: Request, res: Response) => {
     for (const row of result.rows) {
       const itemsResult = await pool.query(
         `SELECT
-          id,
-          ticket_id,
-          name,
-          price,
-          quantity,
-          paid_amount,
-          created_at
+          ticket_items.id,
+          ticket_items.ticket_id,
+          ticket_items.name,
+          ticket_items.price,
+          ticket_items.quantity,
+          ticket_items.paid_amount,
+          ticket_items.created_at
         FROM ticket_items
-        WHERE ticket_id = $1
-        ORDER BY created_at`,
+        WHERE ticket_items.ticket_id = $1
+        ORDER BY ticket_items.created_at`,
         [row.id]
       );
 
@@ -110,7 +110,7 @@ router.get('/:ticketId', async (req: Request, res: Response) => {
 
     // Get ticket
     const ticketResult = await pool.query(
-      'SELECT * FROM tickets WHERE id = $1',
+      'SELECT * FROM tickets WHERE tickets.id = $1',
       [ticketId]
     );
 
@@ -126,16 +126,16 @@ router.get('/:ticketId', async (req: Request, res: Response) => {
     // Get items
     const itemsResult = await pool.query(
       `SELECT
-        id,
-        ticket_id,
-        name,
-        price,
-        quantity,
-        paid_amount,
-        created_at
+        ticket_items.id,
+        ticket_items.ticket_id,
+        ticket_items.name,
+        ticket_items.price,
+        ticket_items.quantity,
+        ticket_items.paid_amount,
+        ticket_items.created_at
       FROM ticket_items
-      WHERE ticket_id = $1
-      ORDER BY created_at`,
+      WHERE ticket_items.ticket_id = $1
+      ORDER BY ticket_items.created_at`,
       [ticketId]
     );
 
@@ -203,7 +203,15 @@ router.post('/', async (req: Request, res: Response) => {
     const result = await pool.query(
       `INSERT INTO tickets (restaurant_id, mesa_id, status, total_amount, currency, created_at, updated_at)
        VALUES ($1, $2, 'OPEN', 0, 'DOP', NOW(), NOW())
-       RETURNING *`,
+       RETURNING 
+         tickets.id,
+         tickets.restaurant_id,
+         tickets.mesa_id,
+         tickets.status,
+         tickets.total_amount,
+         tickets.currency,
+         tickets.created_at,
+         tickets.updated_at`,
       [restaurant_id, mesa_id]
     );
 
