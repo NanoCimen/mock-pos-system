@@ -21,16 +21,18 @@ router.post('/', async (req: Request, res: Response) => {
       });
     }
 
-    const { ticketId, items, amount, method, externalProvider, externalPaymentId } = req.body as CreatePaymentRequest;
+    const { ticket_id, items, amount, method, externalProvider, externalPaymentId } = req.body as CreatePaymentRequest;
 
     // Validate request
-    if (!ticketId || !items || !Array.isArray(items) || items.length === 0) {
+    if (!ticket_id || !items || !Array.isArray(items) || items.length === 0) {
       await client.query('ROLLBACK');
       return res.status(400).json({
         success: false,
-        error: 'ticketId and items array are required',
+        error: 'ticket_id and items array are required',
       });
     }
+
+    const ticketId = ticket_id;
 
     if (!amount || amount <= 0) {
       await client.query('ROLLBACK');
@@ -58,9 +60,13 @@ router.post('/', async (req: Request, res: Response) => {
       });
     }
 
+    // Convert to snake_case for consistency
+    const external_payment_id = externalPaymentId;
+    const external_provider = externalProvider;
+
     // Get ticket
     const ticketResult = await client.query(
-      'SELECT * FROM tickets WHERE id = $1',
+      'SELECT * FROM tickets WHERE tickets.id = $1',
       [ticketId]
     );
 
@@ -94,7 +100,16 @@ router.post('/', async (req: Request, res: Response) => {
 
     // Get all ticket items
     const itemsResult = await client.query(
-      'SELECT * FROM ticket_items WHERE ticket_id = $1',
+      `SELECT
+        ticket_items.id,
+        ticket_items.ticket_id,
+        ticket_items.name,
+        ticket_items.price,
+        ticket_items.quantity,
+        ticket_items.paid_amount,
+        ticket_items.created_at
+      FROM ticket_items 
+      WHERE ticket_items.ticket_id = $1`,
       [ticketId]
     );
 
@@ -170,7 +185,7 @@ router.post('/', async (req: Request, res: Response) => {
         payments.currency,
         payments.status,
         payments.created_at`,
-      [externalPaymentId, externalProvider, methodUpper, ticketId, amount, ticket.currency || 'DOP']
+      [external_payment_id, external_provider, methodUpper, ticketId, amount, ticket.currency || 'DOP']
     );
 
     const paymentRow = paymentResult.rows[0];
