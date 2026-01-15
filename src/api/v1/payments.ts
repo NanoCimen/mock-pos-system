@@ -1,16 +1,20 @@
-import { Router } from 'express';
+import { Router, Request, Response } from 'express';
 import pool from '../../db/connection';
-import { Payment, TicketItem, CreatePaymentRequest } from '../../types/index';
-import { generateId, determineItemStatus, determineTicketStatus, shouldSimulateFailure, simulateDelay } from '../../utils/helpers';
+import { Payment, CreatePaymentRequest } from '../../types/index';
+import { shouldSimulateFailure, simulateDelay } from '../../utils/helpers';
 
 const router = Router();
 
 // POST /api/v1/payments - Process external payment
-router.post('/', async (req, res) => {
+router.post('/', async (req: Request, res: Response) => {
+  const client = await pool.connect();
+  
   try {
+    await client.query('BEGIN');
     await simulateDelay();
     
     if (shouldSimulateFailure()) {
+      await client.query('ROLLBACK');
       return res.status(500).json({
         success: false,
         error: 'Simulated server error',
@@ -21,6 +25,7 @@ router.post('/', async (req, res) => {
 
     // Validate request
     if (!ticketId || !items || !Array.isArray(items) || items.length === 0) {
+      await client.query('ROLLBACK');
       return res.status(400).json({
         success: false,
         error: 'ticketId and items array are required',
@@ -28,20 +33,25 @@ router.post('/', async (req, res) => {
     }
 
     if (!amount || amount <= 0) {
+      await client.query('ROLLBACK');
       return res.status(400).json({
         success: false,
         error: 'amount must be greater than 0',
       });
     }
 
-    if (!method || !['card', 'cash', 'transfer'].includes(method)) {
+    // Convert method to uppercase
+    const methodUpper = method?.toUpperCase();
+    if (!methodUpper || !['CARD', 'CASH'].includes(methodUpper)) {
+      await client.query('ROLLBACK');
       return res.status(400).json({
         success: false,
-        error: 'method must be one of: card, cash, transfer',
+        error: 'method must be one of: CARD, CASH',
       });
     }
 
     if (!externalProvider || !externalPaymentId) {
+      await client.query('ROLLBACK');
       return res.status(400).json({
         success: false,
         error: 'externalProvider and externalPaymentId are required',
@@ -49,12 +59,13 @@ router.post('/', async (req, res) => {
     }
 
     // Get ticket
-    const ticketResult = await pool.query(
+    const ticketResult = await client.query(
       'SELECT * FROM tickets WHERE id = $1',
       [ticketId]
     );
 
     if (ticketResult.rows.length === 0) {
+      await client.query('ROLLBACK');
       return res.status(404).json({
         success: false,
         error: 'Ticket not found',
@@ -64,7 +75,8 @@ router.post('/', async (req, res) => {
     const ticket = ticketResult.rows[0];
 
     // FAILURE MODE: Ticket already paid
-    if (ticket.status === 'paid') {
+    if (ticket.status === 'PAID') {
+      await client.query('ROLLBACK');
       return res.status(400).json({
         success: false,
         error: 'Ticket is already fully paid',
@@ -72,7 +84,8 @@ router.post('/', async (req, res) => {
     }
 
     // FAILURE MODE: Ticket closed
-    if (ticket.status === 'cancelled') {
+    if (ticket.status === 'CANCELLED') {
+      await client.query('ROLLBACK');
       return res.status(400).json({
         success: false,
         error: 'Ticket is cancelled',
@@ -80,7 +93,7 @@ router.post('/', async (req, res) => {
     }
 
     // Get all ticket items
-    const itemsResult = await pool.query(
+    const itemsResult = await client.query(
       'SELECT * FROM ticket_items WHERE ticket_id = $1',
       [ticketId]
     );
@@ -92,10 +105,11 @@ router.post('/', async (req, res) => {
 
     // Validate payment items and calculate expected amount
     let calculatedAmount = 0;
-    const itemUpdates: { itemId: string; newPaidQuantity: number }[] = [];
+    const paymentItemsData: { ticketItemId: string; amount: number; quantity: number }[] = [];
 
     for (const paymentItem of items) {
       if (!paymentItem.itemId || !paymentItem.quantity) {
+        await client.query('ROLLBACK');
         return res.status(400).json({
           success: false,
           error: 'Each payment item must have itemId and quantity',
@@ -104,109 +118,135 @@ router.post('/', async (req, res) => {
 
       const ticketItem = ticketItems.get(paymentItem.itemId);
       if (!ticketItem) {
+        await client.query('ROLLBACK');
         return res.status(404).json({
           success: false,
           error: `Item ${paymentItem.itemId} not found on ticket`,
         });
       }
 
-      const availableQuantity = ticketItem.quantity - ticketItem.paid_quantity;
-
-      // FAILURE MODE: Item already paid
-      if (availableQuantity === 0) {
-        return res.status(400).json({
-          success: false,
-          error: `Item ${paymentItem.itemId} (${ticketItem.name}) is already fully paid`,
-        });
-      }
-
-      // FAILURE MODE: Quantity not available
-      if (paymentItem.quantity > availableQuantity) {
-        return res.status(400).json({
-          success: false,
-          error: `Only ${availableQuantity} units of ${ticketItem.name} are available for payment (${ticketItem.paid_quantity} already paid)`,
-        });
-      }
-
-      calculatedAmount += parseFloat(ticketItem.unit_price) * paymentItem.quantity;
-      itemUpdates.push({
-        itemId: paymentItem.itemId,
-        newPaidQuantity: ticketItem.paid_quantity + paymentItem.quantity,
+      const itemPrice = ticketItem.price;
+      const itemTotal = itemPrice * paymentItem.quantity;
+      calculatedAmount += itemTotal;
+      
+      paymentItemsData.push({
+        ticketItemId: paymentItem.itemId,
+        amount: itemTotal,
+        quantity: paymentItem.quantity,
       });
     }
 
-    // Round to 2 decimal places
-    calculatedAmount = Math.round(calculatedAmount * 100) / 100;
+    // Round to integer (cents)
+    calculatedAmount = Math.round(calculatedAmount);
 
     // FAILURE MODE: Payment amount mismatch
-    if (Math.abs(calculatedAmount - amount) > 0.01) {
+    if (Math.abs(calculatedAmount - amount) > 0) {
+      await client.query('ROLLBACK');
       return res.status(400).json({
         success: false,
         error: `Payment amount mismatch. Expected ${calculatedAmount}, got ${amount}`,
       });
     }
 
-    // Create payment record
-    const paymentId = generateId('payment');
-    const paymentResult = await pool.query(
-      `INSERT INTO payments (id, ticket_id, amount, method, external_provider, external_payment_id, status, items, created_at, updated_at)
-       VALUES ($1, $2, $3, $4, $5, $6, 'confirmed', $7, NOW(), NOW())
-       RETURNING *`,
-      [paymentId, ticketId, amount, method, externalProvider, externalPaymentId, JSON.stringify(items)]
+    // Insert payment record
+    const paymentResult = await client.query(
+      `INSERT INTO payments (
+        external_payment_id,
+        external_provider,
+        method,
+        ticket_id,
+        amount,
+        currency,
+        status
+      )
+      VALUES ($1, $2, $3, $4, $5, $6, 'CONFIRMED')
+      RETURNING *`,
+      [externalPaymentId, externalProvider, methodUpper, ticketId, amount, ticket.currency || 'DOP']
     );
 
     const paymentRow = paymentResult.rows[0];
+    const paymentId = paymentRow.id;
 
-    // Update item paid quantities
-    for (const update of itemUpdates) {
-      const item = ticketItems.get(update.itemId);
-      const newStatus = determineItemStatus(item.quantity, update.newPaidQuantity);
+    // Insert payment items
+    for (const paymentItem of paymentItemsData) {
+      await client.query(
+        `INSERT INTO payment_items (
+          payment_id,
+          ticket_item_id,
+          amount,
+          quantity
+        )
+        VALUES ($1, $2, $3, $4)`,
+        [paymentId, paymentItem.ticketItemId, paymentItem.amount, paymentItem.quantity]
+      );
+
+      // Update ticket_item paid_amount (sum of all payment_items for this ticket_item)
+      const paidAmountResult = await client.query(
+        `SELECT COALESCE(SUM(amount), 0) as total_paid
+         FROM payment_items pi
+         JOIN payments p ON pi.payment_id = p.id
+         WHERE pi.ticket_item_id = $1 AND p.status = 'CONFIRMED'`,
+        [paymentItem.ticketItemId]
+      );
+
+      const totalPaid = parseInt(paidAmountResult.rows[0].total_paid);
+      const ticketItem = ticketItems.get(paymentItem.ticketItemId);
+      const itemTotalPrice = ticketItem.price * ticketItem.quantity;
       
-      await pool.query(
-        `UPDATE ticket_items SET paid_quantity = $1, status = $2, updated_at = NOW() WHERE id = $3`,
-        [update.newPaidQuantity, newStatus, update.itemId]
+      // Update paid_amount and is_paid
+      await client.query(
+        `UPDATE ticket_items 
+         SET paid_amount = $1, 
+             is_paid = $2 
+         WHERE id = $3`,
+        [totalPaid, totalPaid >= itemTotalPrice, paymentItem.ticketItemId]
       );
     }
 
-    // Get updated items to determine ticket status
-    const updatedItemsResult = await pool.query(
-      'SELECT * FROM ticket_items WHERE ticket_id = $1',
+    // Update ticket status based on all items
+    const allItemsResult = await client.query(
+      `SELECT *, (price * quantity) as total_price 
+       FROM ticket_items 
+       WHERE ticket_id = $1`,
       [ticketId]
     );
 
-    const updatedItems: TicketItem[] = updatedItemsResult.rows.map(row => ({
-      id: row.id,
-      ticket_id: row.ticket_id,
-      name: row.name,
-      unit_price: parseFloat(row.unit_price),
-      quantity: row.quantity,
-      paid_quantity: row.paid_quantity,
-      notes: row.notes,
-      status: row.status,
-      created_at: row.created_at,
-      updated_at: row.updated_at,
-    }));
+    const allPaid = allItemsResult.rows.every((row: any) => row.paid_amount >= row.total_price);
+    const somePaid = allItemsResult.rows.some((row: any) => row.paid_amount > 0);
 
-    const newTicketStatus = determineTicketStatus(updatedItems);
-    const closedAt = newTicketStatus === 'paid' ? 'NOW()' : ticket.closed_at;
+    let newStatus = 'OPEN';
+    if (allPaid) {
+      newStatus = 'PAID';
+    } else if (somePaid) {
+      newStatus = 'PARTIALLY_PAID';
+    }
 
-    // Update ticket status
-    await pool.query(
-      `UPDATE tickets SET status = $1, closed_at = $2, updated_at = NOW() WHERE id = $3`,
-      [newTicketStatus, closedAt, ticketId]
+    await client.query(
+      `UPDATE tickets SET status = $1, updated_at = NOW() WHERE id = $2`,
+      [newStatus, ticketId]
+    );
+
+    await client.query('COMMIT');
+
+    // Fetch payment with items
+    const paymentItemsResult = await client.query(
+      `SELECT pi.*, ti.name as item_name
+       FROM payment_items pi
+       JOIN ticket_items ti ON pi.ticket_item_id = ti.id
+       WHERE pi.payment_id = $1`,
+      [paymentId]
     );
 
     const payment: Payment = {
       id: paymentRow.id,
       ticket_id: paymentRow.ticket_id,
-      amount: parseFloat(paymentRow.amount),
-      method: paymentRow.method,
-      external_provider: paymentRow.external_provider,
       external_payment_id: paymentRow.external_payment_id,
+      external_provider: paymentRow.external_provider,
+      method: paymentRow.method,
+      amount: paymentRow.amount,
+      currency: paymentRow.currency,
       status: paymentRow.status,
-      items: typeof paymentRow.items === 'string' ? JSON.parse(paymentRow.items) : paymentRow.items,
       created_at: paymentRow.created_at,
-      updated_at: paymentRow.updated_at,
     };
 
     return res.status(201).json({
@@ -214,16 +254,19 @@ router.post('/', async (req, res) => {
       data: payment,
     });
   } catch (error: any) {
+    await client.query('ROLLBACK');
     console.error('Error processing payment:', error);
     return res.status(500).json({
       success: false,
       error: error.message,
     });
+  } finally {
+    client.release();
   }
 });
 
 // GET /api/v1/payments?ticketId=xxx - Get payments for a ticket
-router.get('/', async (req, res) => {
+router.get('/', async (req: Request, res: Response) => {
   try {
     await simulateDelay();
     
@@ -248,18 +291,35 @@ router.get('/', async (req, res) => {
       [ticketId]
     );
 
-    const payments: Payment[] = result.rows.map(row => ({
-      id: row.id,
-      ticket_id: row.ticket_id,
-      amount: parseFloat(row.amount),
-      method: row.method,
-      external_provider: row.external_provider,
-      external_payment_id: row.external_payment_id,
-      status: row.status,
-      items: typeof row.items === 'string' ? JSON.parse(row.items) : row.items,
-      created_at: row.created_at,
-      updated_at: row.updated_at,
-    }));
+    // Fetch payment_items for each payment
+    const payments: any[] = [];
+    for (const row of result.rows) {
+      const itemsResult = await pool.query(
+        `SELECT pi.*, ti.name as item_name
+         FROM payment_items pi
+         JOIN ticket_items ti ON pi.ticket_item_id = ti.id
+         WHERE pi.payment_id = $1`,
+        [row.id]
+      );
+
+      payments.push({
+        id: row.id,
+        ticket_id: row.ticket_id,
+        external_payment_id: row.external_payment_id,
+        external_provider: row.external_provider,
+        method: row.method,
+        amount: row.amount,
+        currency: row.currency,
+        status: row.status,
+        created_at: row.created_at,
+        items: itemsResult.rows.map((item: any) => ({
+          itemId: item.ticket_item_id,
+          itemName: item.item_name,
+          amount: item.amount,
+          quantity: item.quantity,
+        })),
+      });
+    }
 
     return res.json({
       success: true,

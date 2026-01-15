@@ -1,0 +1,31 @@
+import { Pool } from "pg";
+
+const pool = new Pool({
+  connectionString:
+    process.env.DATABASE_URL || process.env.DATABASE_PUBLIC_URL,
+  ssl: { rejectUnauthorized: false },
+});
+
+async function migrate() {
+  console.log("🔄 Creating payment_items table");
+
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS payment_items (
+      id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+      payment_id UUID NOT NULL REFERENCES payments(id) ON DELETE CASCADE,
+      ticket_item_id UUID NOT NULL REFERENCES ticket_items(id) ON DELETE CASCADE,
+      amount INTEGER NOT NULL,
+      quantity INTEGER NOT NULL DEFAULT 1,
+      created_at TIMESTAMP DEFAULT NOW()
+    );
+  `);
+
+  console.log("✅ payment_items table created");
+  await pool.end();
+  process.exit(0);
+}
+
+migrate().catch((err) => {
+  console.error("❌ Migration failed:", err);
+  process.exit(1);
+});

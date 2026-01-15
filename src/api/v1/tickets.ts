@@ -49,7 +49,8 @@ router.get('/', async (req: Request, res: Response) => {
         name: itemRow.name,
         price: itemRow.price,
         quantity: itemRow.quantity,
-        is_paid: itemRow.is_paid,
+        is_paid: itemRow.is_paid || false,
+        paid_amount: itemRow.paid_amount || 0,
         created_at: itemRow.created_at,
       }));
 

@@ -19,6 +19,7 @@ export interface TicketItem {
   price: number; // in cents
   quantity: number;
   is_paid: boolean;
+  paid_amount: number; // in cents
   created_at: Date;
 }
 
@@ -27,10 +28,21 @@ export interface Payment {
   id: string; // UUID
   ticket_id: string; // UUID
   external_payment_id: string;
+  external_provider: string;
   amount: number; // in cents
   method: 'CARD' | 'CASH';
   status: 'CONFIRMED' | 'FAILED';
+  currency: string;
   created_at: Date;
+  items?: PaymentItemDetail[];
+}
+
+// Payment Item Detail (for GET responses)
+export interface PaymentItemDetail {
+  itemId: string;
+  itemName: string;
+  amount: number;
+  quantity: number;
 }
 
 // API Request/Response types
@@ -51,7 +63,7 @@ export interface CreatePaymentRequest {
   ticket_id: string;
   items: PaymentItem[];
   amount: number; // in cents
-  method: 'CARD' | 'CASH';
+  method: 'card' | 'cash' | 'CARD' | 'CASH'; // Accept both formats
   externalProvider: string;
   externalPaymentId: string;
 }
