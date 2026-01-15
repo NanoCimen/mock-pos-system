@@ -1,54 +1,59 @@
-// POS Configuration
-export interface PosConfig {
-  id: number;
-  name: string;
-  currency: 'DOP' | 'USD';
-  tax_rate: number;
-  created_at: Date;
-}
-
-// Ticket (replaces Bill)
+// Ticket (YAPos production model)
 export interface Ticket {
-  id: string;
-  table_id: string;
-  status: 'open' | 'partially_paid' | 'paid' | 'cancelled';
-  currency: 'DOP' | 'USD';
-  subtotal: number;
-  tax: number;
-  total: number;
-  opened_at: Date;
-  closed_at?: Date;
+  id: string; // UUID
+  restaurant_id: string;
+  mesa_id: string;
+  status: 'OPEN' | 'PARTIALLY_PAID' | 'PAID';
+  total_amount: number; // in cents
+  currency: string;
   created_at: Date;
   updated_at: Date;
   items?: TicketItem[];
 }
 
-// Ticket Item (with partial payment support)
+// Ticket Item
 export interface TicketItem {
-  id: string;
-  ticket_id: string;
+  id: string; // UUID
+  ticket_id: string; // UUID
   name: string;
-  unit_price: number;
+  price: number; // in cents
   quantity: number;
-  paid_quantity: number;
-  notes?: string;
-  status: 'unpaid' | 'partially_paid' | 'paid';
+  is_paid: boolean;
   created_at: Date;
-  updated_at: Date;
 }
 
 // Payment (External)
 export interface Payment {
-  id: string;
-  ticket_id: string;
-  amount: number;
-  method: 'card' | 'cash' | 'transfer';
-  external_provider: string;
+  id: string; // UUID
+  ticket_id: string; // UUID
   external_payment_id: string;
-  status: 'pending' | 'confirmed' | 'failed';
-  items: PaymentItem[];
+  amount: number; // in cents
+  method: 'CARD' | 'CASH';
+  status: 'CONFIRMED' | 'FAILED';
   created_at: Date;
-  updated_at: Date;
+}
+
+// API Request/Response types
+export interface CreateTicketRequest {
+  restaurant_id: string;
+  mesa_id: string;
+}
+
+export interface AddItemsRequest {
+  items: {
+    name: string;
+    price: number; // in cents
+    quantity: number;
+  }[];
+}
+
+export interface CreatePaymentRequest {
+  ticket_id: string;
+  items: PaymentItem[];
+  amount: number; // in cents
+  method: 'CARD' | 'CASH';
+  externalProvider: string;
+  externalPaymentId: string;
 }
 
 export interface PaymentItem {
@@ -56,45 +61,18 @@ export interface PaymentItem {
   quantity: number;
 }
 
-// API Request/Response types
-export interface CreateTicketRequest {
-  tableId: string;
+// API Response wrappers
+export interface ApiResponse<T> {
+  success: boolean;
+  data?: T;
+  error?: string;
 }
 
-export interface AddItemsRequest {
-  items: {
-    name: string;
-    unitPrice: number;
-    quantity: number;
-    notes?: string;
-  }[];
-}
-
-export interface UpdateItemRequest {
-  paidQuantity?: number;
-  notes?: string;
-}
-
-export interface CreatePaymentRequest {
-  ticketId: string;
-  items: PaymentItem[];
-  amount: number;
-  method: 'card' | 'cash' | 'transfer';
-  externalProvider: string;
-  externalPaymentId: string;
-}
-
+// POS Capabilities
 export interface PosCapabilities {
   supportsPartialPayments: boolean;
   supportsItemLocking: boolean;
   supportsWebhooks: boolean;
   supportsRefunds: boolean;
   currency: string[];
-}
-
-// API Response wrappers
-export interface ApiResponse<T> {
-  success: boolean;
-  data?: T;
-  error?: string;
 }
