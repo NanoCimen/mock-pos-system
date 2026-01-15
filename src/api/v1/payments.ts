@@ -21,20 +21,26 @@ router.post('/', async (req: Request, res: Response) => {
       });
     }
 
-    const { ticket_id, items, amount, method, externalProvider, externalPaymentId } = req.body as CreatePaymentRequest;
+    // Normalize request body: accept both camelCase and snake_case
+    const body = {
+      ticketId: req.body.ticketId ?? req.body.ticket_id,
+      externalProvider: req.body.externalProvider ?? req.body.external_provider,
+      externalPaymentId: req.body.externalPaymentId ?? req.body.external_payment_id,
+      method: req.body.method,
+      amount: req.body.amount,
+      items: req.body.items,
+    };
 
     // Validate request
-    if (!ticket_id || !items || !Array.isArray(items) || items.length === 0) {
+    if (!body.ticketId || !Array.isArray(body.items) || body.items.length === 0) {
       await client.query('ROLLBACK');
       return res.status(400).json({
         success: false,
-        error: 'ticket_id and items array are required',
+        error: 'ticketId and items array are required',
       });
     }
 
-    const ticketId = ticket_id;
-
-    if (!amount || amount <= 0) {
+    if (!body.amount || body.amount <= 0) {
       await client.query('ROLLBACK');
       return res.status(400).json({
         success: false,
@@ -43,7 +49,7 @@ router.post('/', async (req: Request, res: Response) => {
     }
 
     // Convert method to uppercase
-    const methodUpper = method?.toUpperCase();
+    const methodUpper = body.method?.toUpperCase();
     if (!methodUpper || !['CARD', 'CASH'].includes(methodUpper)) {
       await client.query('ROLLBACK');
       return res.status(400).json({
@@ -52,7 +58,7 @@ router.post('/', async (req: Request, res: Response) => {
       });
     }
 
-    if (!externalProvider || !externalPaymentId) {
+    if (!body.externalProvider || !body.externalPaymentId) {
       await client.query('ROLLBACK');
       return res.status(400).json({
         success: false,
@@ -60,9 +66,11 @@ router.post('/', async (req: Request, res: Response) => {
       });
     }
 
-    // Convert to snake_case for consistency
-    const external_payment_id = externalPaymentId;
-    const external_provider = externalProvider;
+    // Extract normalized values
+    const ticketId = body.ticketId;
+    const amount = body.amount;
+    const external_payment_id = body.externalPaymentId;
+    const external_provider = body.externalProvider;
 
     // Get ticket
     const ticketResult = await client.query(
@@ -122,7 +130,7 @@ router.post('/', async (req: Request, res: Response) => {
     let calculatedAmount = 0;
     const paymentItemsData: { ticketItemId: string; amount: number; quantity: number }[] = [];
 
-    for (const paymentItem of items) {
+    for (const paymentItem of body.items) {
       if (!paymentItem.itemId || !paymentItem.quantity) {
         await client.query('ROLLBACK');
         return res.status(400).json({
