@@ -193,13 +193,12 @@ router.post('/', async (req: Request, res: Response) => {
       const ticketItem = ticketItems.get(paymentItem.ticketItemId);
       const itemTotalPrice = ticketItem.price * ticketItem.quantity;
       
-      // Update paid_amount and is_paid
+      // Update paid_amount (is_paid is derived, not stored)
       await client.query(
         `UPDATE ticket_items 
-         SET paid_amount = $1, 
-             is_paid = $2 
-         WHERE id = $3`,
-        [totalPaid, totalPaid >= itemTotalPrice, paymentItem.ticketItemId]
+         SET paid_amount = $1 
+         WHERE id = $2`,
+        [totalPaid, paymentItem.ticketItemId]
       );
     }
 

@@ -39,20 +39,34 @@ router.get('/', async (req: Request, res: Response) => {
     // Fetch items for each ticket
     for (const row of result.rows) {
       const itemsResult = await pool.query(
-        'SELECT * FROM ticket_items WHERE ticket_id = $1 ORDER BY created_at',
+        `SELECT
+          id,
+          ticket_id,
+          name,
+          price,
+          quantity,
+          paid_amount,
+          created_at
+        FROM ticket_items
+        WHERE ticket_id = $1
+        ORDER BY created_at`,
         [row.id]
       );
 
-      const items: TicketItem[] = itemsResult.rows.map((itemRow: any) => ({
-        id: itemRow.id,
-        ticket_id: itemRow.ticket_id,
-        name: itemRow.name,
-        price: itemRow.price,
-        quantity: itemRow.quantity,
-        is_paid: itemRow.is_paid || false,
-        paid_amount: itemRow.paid_amount || 0,
-        created_at: itemRow.created_at,
-      }));
+      const items: TicketItem[] = itemsResult.rows.map((itemRow: any) => {
+        const paidAmount = itemRow.paid_amount || 0;
+        const itemTotalPrice = itemRow.price * itemRow.quantity;
+        return {
+          id: itemRow.id,
+          ticket_id: itemRow.ticket_id,
+          name: itemRow.name,
+          price: itemRow.price,
+          quantity: itemRow.quantity,
+          paid_amount: paidAmount,
+          is_paid: paidAmount >= itemTotalPrice,
+          created_at: itemRow.created_at,
+        };
+      });
 
       tickets.push({
         id: row.id,
@@ -111,19 +125,34 @@ router.get('/:ticketId', async (req: Request, res: Response) => {
 
     // Get items
     const itemsResult = await pool.query(
-      'SELECT * FROM ticket_items WHERE ticket_id = $1 ORDER BY created_at',
+      `SELECT
+        id,
+        ticket_id,
+        name,
+        price,
+        quantity,
+        paid_amount,
+        created_at
+      FROM ticket_items
+      WHERE ticket_id = $1
+      ORDER BY created_at`,
       [ticketId]
     );
 
-    const items: TicketItem[] = itemsResult.rows.map((itemRow: any) => ({
-      id: itemRow.id,
-      ticket_id: itemRow.ticket_id,
-      name: itemRow.name,
-      price: itemRow.price,
-      quantity: itemRow.quantity,
-      is_paid: itemRow.is_paid,
-      created_at: itemRow.created_at,
-    }));
+    const items: TicketItem[] = itemsResult.rows.map((itemRow: any) => {
+      const paidAmount = itemRow.paid_amount || 0;
+      const itemTotalPrice = itemRow.price * itemRow.quantity;
+      return {
+        id: itemRow.id,
+        ticket_id: itemRow.ticket_id,
+        name: itemRow.name,
+        price: itemRow.price,
+        quantity: itemRow.quantity,
+        paid_amount: paidAmount,
+        is_paid: paidAmount >= itemTotalPrice,
+        created_at: itemRow.created_at,
+      };
+    });
 
     const ticket: Ticket = {
       id: ticketRow.id,
