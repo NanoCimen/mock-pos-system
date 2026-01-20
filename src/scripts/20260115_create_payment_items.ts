@@ -1,9 +1,19 @@
+import dotenv from "dotenv";
+dotenv.config();
+
 import { Pool } from "pg";
+
+// Determine if we need SSL (typically for cloud databases)
+const useSSL = process.env.DATABASE_URL?.includes('amazonaws.com') ||
+               process.env.DATABASE_URL?.includes('supabase.co') ||
+               process.env.DATABASE_URL?.includes('railway.app') ||
+               process.env.USE_SSL === 'true' ||
+               process.env.NODE_ENV === 'production';
 
 const pool = new Pool({
   connectionString:
     process.env.DATABASE_URL || process.env.DATABASE_PUBLIC_URL,
-  ssl: { rejectUnauthorized: false },
+  ssl: useSSL ? { rejectUnauthorized: false } : false,
 });
 
 async function migrate() {
