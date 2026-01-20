@@ -45,11 +45,19 @@ app.use((err: any, req: Request, res: Response, next: NextFunction) => {
 // Start server
 const PORT = Number(process.env.PORT) || 3000;
 
+// Determine API URL based on environment
+const isProduction = process.env.NODE_ENV === 'production' || process.env.RAILWAY_ENVIRONMENT;
+const apiBaseUrl = process.env.POS_BASE_URL || 
+  (isProduction ? 'https://pos.yap.net.do/api/v1' : `http://localhost:${PORT}/api/v1`);
+
 console.log("FINAL PORT USED =", PORT);
 
 app.listen(PORT, "0.0.0.0", () => {
   console.log(`🚀 POS Simulator running on port ${PORT}`);
-  console.log(`📍 API: http://localhost:${PORT}/api/v1`);
+  console.log(`📍 API: ${apiBaseUrl}`);
+  if (isProduction) {
+    console.log(`🌐 Cloud deployment: Railway`);
+  }
   console.log(`🔑 API Key: ${process.env.POS_API_KEY || 'dev-api-key-12345'}`);
   console.log(`⚡ Simulated delay: ${process.env.SIMULATED_DELAY_MS || 0}ms`);
   console.log(`💥 Failure rate: ${parseFloat(process.env.FAILURE_RATE || '0') * 100}%`);
