@@ -2,12 +2,13 @@ import { Router } from 'express';
 import ticketsRouter from './tickets';
 import itemsRouter from './items';
 import paymentsRouter from './payments';
+import tablesRouter from './tables';
 
 const router = Router();
 
 // GET /api/v1/health - Health check (for Railway)
 router.get('/health', (req, res) => {
-  res.json({ status: 'ok', timestamp: new Date().toISOString() });
+  res.json({ success: true, status: 'ok', timestamp: new Date().toISOString() });
 });
 
 // GET /api/v1/capabilities - POS capabilities (NO DATABASE - static response)
@@ -25,6 +26,7 @@ router.get('/capabilities', (_req, res) => {
 });
 
 // Mount sub-routers
+router.use('/tables', tablesRouter);
 router.use('/tickets', ticketsRouter);
 router.use('/tickets', itemsRouter); // For /tickets/:ticketId/items
 router.use('/items', itemsRouter); // For /items/:itemId

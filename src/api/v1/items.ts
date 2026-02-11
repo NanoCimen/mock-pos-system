@@ -217,6 +217,58 @@ router.post('/:ticketId/items', async (req: Request, res: Response) => {
   }
 });
 
+// DELETE /api/v1/items/:itemId - Remove item from ticket and recalc total
+router.delete('/:itemId', async (req: Request, res: Response) => {
+  try {
+    await simulateDelay();
+    if (shouldSimulateFailure()) {
+      return res.status(500).json({ success: false, error: 'Simulated server error' });
+    }
+    const { itemId } = req.params;
+
+    const itemResult = await pool.query(
+      'SELECT id, ticket_id, paid_amount, price, quantity FROM ticket_items WHERE ticket_items.id = $1',
+      [itemId]
+    );
+    if (itemResult.rows.length === 0) {
+      return res.status(404).json({ success: false, error: 'Item not found' });
+    }
+    const item = itemResult.rows[0];
+    const ticketId = item.ticket_id;
+
+    const ticketResult = await pool.query('SELECT * FROM tickets WHERE tickets.id = $1', [ticketId]);
+    if (ticketResult.rows.length === 0) {
+      return res.status(404).json({ success: false, error: 'Ticket not found' });
+    }
+    const ticket = ticketResult.rows[0];
+    if (ticket.status === 'PAID') {
+      return res.status(400).json({ success: false, error: 'Cannot remove items from a paid ticket' });
+    }
+    if (item.paid_amount > 0) {
+      return res.status(400).json({ success: false, error: 'Cannot remove item that has paid amount' });
+    }
+
+    await pool.query('DELETE FROM ticket_items WHERE ticket_items.id = $1', [itemId]);
+
+    const sumResult = await pool.query(
+      `SELECT COALESCE(SUM(ticket_items.price * ticket_items.quantity), 0)::integer AS total
+       FROM ticket_items WHERE ticket_items.ticket_id = $1`,
+      [ticketId]
+    );
+    const totalAmount = sumResult.rows[0].total;
+
+    await pool.query(
+      'UPDATE tickets SET total_amount = $1, updated_at = NOW() WHERE tickets.id = $2',
+      [totalAmount, ticketId]
+    );
+
+    return res.status(200).json({ success: true, total_amount: totalAmount });
+  } catch (error: any) {
+    console.error('Error deleting item:', error);
+    return res.status(500).json({ success: false, error: error.message });
+  }
+});
+
 // PATCH /api/v1/items/:itemId - Update an item (notes only - paid_amount managed via payments)
 router.patch('/:itemId', async (req: Request, res: Response) => {
   try {

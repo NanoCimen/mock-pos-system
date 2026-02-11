@@ -31,7 +31,7 @@ async function verifyTicket() {
     console.log(`✅ Ticket found:`);
     console.log(`   ID: ${ticket.id}`);
     console.log(`   Status: ${ticket.status}`);
-    console.log(`   Total: ${ticket.total_amount} cents`);
+    console.log(`   Total: ${ticket.total_amount} DOP`);
     console.log(`   Currency: ${ticket.currency}`);
 
     // Check items

@@ -159,7 +159,6 @@ router.post('/', async (req: Request, res: Response) => {
       });
     }
 
-    // Round to integer (cents)
     calculatedAmount = Math.round(calculatedAmount);
 
     // FAILURE MODE: Payment amount mismatch

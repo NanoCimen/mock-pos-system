@@ -34,6 +34,7 @@ FAILURE_RATE=0.0
 
 ```bash
 npm run db:init
+npm run db:migrate:tables   # creates tables (mesas) for the POS UI
 npm run db:seed
 ```
 
@@ -421,6 +422,16 @@ The database comes with pre-seeded data:
 - Item quantities must be positive integers
 - Partial payments are tracked per item
 - Ticket status automatically updates based on item payment status
+
+---
+
+## 🖥️ POS UI and tables (for YAP testing)
+
+A minimal web UI lets you **create tables** and **tickets** and copy ticket IDs for YAP:
+
+- **Run UI locally:** `npm run pos-ui:dev` then open http://localhost:3003 (API: http://localhost:3000/api/v1).
+- **Use cloud POS:** Set `VITE_POS_API_URL=https://pos.yap.net.do/api/v1` and `VITE_POS_API_KEY=...` when running the UI, or open https://pos.yap.net.do after building and deploying (see `pos-ui/README.md`).
+- **Tables API:** `GET /api/v1/tables`, `POST /api/v1/tables` (body: `mesa_id`, `label`, `seats`) — create tables then create tickets per table for YAP testing.
 
 ---
 

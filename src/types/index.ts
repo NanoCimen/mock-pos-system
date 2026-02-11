@@ -4,7 +4,7 @@ export interface Ticket {
   restaurant_id: string;
   mesa_id: string;
   status: 'OPEN' | 'PARTIALLY_PAID' | 'PAID';
-  total_amount: number; // in cents
+  total_amount: number; // in DOP (whole units)
   currency: string;
   created_at: Date;
   updated_at: Date;
@@ -16,10 +16,10 @@ export interface TicketItem {
   id: string; // UUID
   ticket_id: string; // UUID
   name: string;
-  price: number; // in cents
+  price: number; // in DOP (whole units)
   quantity: number;
   is_paid: boolean;
-  paid_amount: number; // in cents
+  paid_amount: number; // in DOP (whole units)
   created_at: Date;
 }
 
@@ -29,7 +29,7 @@ export interface Payment {
   ticket_id: string; // UUID
   external_payment_id: string;
   external_provider: string;
-  amount: number; // in cents
+  amount: number; // in DOP (whole units)
   method: 'CARD' | 'CASH';
   status: 'CONFIRMED' | 'FAILED';
   currency: string;
@@ -54,7 +54,7 @@ export interface CreateTicketRequest {
 export interface AddItemsRequest {
   items: {
     name: string;
-    price: number; // in cents
+    price: number; // in DOP (whole units)
     quantity: number;
   }[];
 }
@@ -62,7 +62,7 @@ export interface AddItemsRequest {
 export interface CreatePaymentRequest {
   ticket_id: string;
   items: PaymentItem[];
-  amount: number; // in cents
+  amount: number; // in DOP (whole units)
   method: 'card' | 'cash' | 'CARD' | 'CASH'; // Accept both formats
   externalProvider: string;
   externalPaymentId: string;
