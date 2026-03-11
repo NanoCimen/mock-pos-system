@@ -57,6 +57,23 @@ export async function createTable(mesa_id: string, label: string, seats: number)
   return data.data;
 }
 
+export async function getTable(id: string): Promise<PosTable> {
+  const { data } = await api.get<{ success: boolean; data: PosTable }>(`/tables/${id}`);
+  return data.data;
+}
+
+export async function updateTable(
+  id: string,
+  updates: { mesa_id?: string; label?: string; seats?: number }
+): Promise<PosTable> {
+  const { data } = await api.patch<{ success: boolean; data: PosTable }>(`/tables/${id}`, updates);
+  return data.data;
+}
+
+export async function deleteTable(id: string): Promise<void> {
+  await api.delete(`/tables/${id}`);
+}
+
 export async function getTickets(params?: { status?: string; mesaId?: string }): Promise<Ticket[]> {
   const { data } = await api.get<{ success: boolean; data: Ticket[] }>('/tickets', { params });
   return data.data;
