@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { getTickets, createTicket, getTables, type Ticket, type PosTable } from '../api/client';
+import { useNavigate, useLocation } from 'react-router-dom';
+import { getTickets, createTicket, getTables, closeTicket, deleteTicket, type Ticket, type PosTable } from '../api/client';
 
 const DEFAULT_RESTAURANT = 'test_restaurant';
 
@@ -10,6 +10,7 @@ interface TicketsViewProps {
 
 export default function TicketsView({ onSelectTicket }: TicketsViewProps) {
   const navigate = useNavigate();
+  const location = useLocation();
   const [tickets, setTickets] = useState<Ticket[]>([]);
   const [tables, setTables] = useState<PosTable[]>([]);
   const [loading, setLoading] = useState(true);
@@ -54,10 +55,36 @@ export default function TicketsView({ onSelectTicket }: TicketsViewProps) {
     }
   }
 
+  async function handleClose(e: React.MouseEvent, t: Ticket) {
+    e.stopPropagation();
+    if (!confirm('Close this paid ticket?')) return;
+    setError(null);
+    try {
+      await closeTicket(t.id);
+      await load();
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Failed to close ticket');
+    }
+  }
+
+  async function handleDelete(e: React.MouseEvent, t: Ticket) {
+    e.stopPropagation();
+    if (!confirm('Eliminate this ticket? This cannot be undone.')) return;
+    setError(null);
+    try {
+      await deleteTicket(t.id);
+      await load();
+      if (location.pathname === `/tickets/${t.id}`) navigate('/tickets');
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Failed to eliminate ticket');
+    }
+  }
+
   function statusClass(s: string) {
     if (s === 'OPEN') return 'badge-open';
     if (s === 'PARTIALLY_PAID') return 'badge-partial';
-    return 'badge-paid';
+    if (s === 'PAID') return 'badge-paid';
+    return 'badge-closed';
   }
 
   if (loading) return <div className="loading">Loading tickets…</div>;
@@ -113,8 +140,28 @@ export default function TicketsView({ onSelectTicket }: TicketsViewProps) {
                   {t.total_amount} {t.currency}
                 </span>
               </div>
-              <div style={{ fontFamily: 'monospace', fontSize: '0.85rem', color: '#94a3b8' }}>
-                {t.id}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
+                {t.status === 'PAID' && (
+                  <button
+                    type="button"
+                    className="btn btn-secondary"
+                    style={{ padding: '0.25rem 0.5rem', fontSize: '0.8rem' }}
+                    onClick={(e) => handleClose(e, t)}
+                  >
+                    Close
+                  </button>
+                )}
+                <button
+                  type="button"
+                  className="btn btn-danger"
+                  style={{ padding: '0.25rem 0.5rem', fontSize: '0.8rem' }}
+                  onClick={(e) => handleDelete(e, t)}
+                >
+                  Eliminate
+                </button>
+                <span style={{ fontFamily: 'monospace', fontSize: '0.85rem', color: '#94a3b8' }}>
+                  {t.id}
+                </span>
               </div>
             </div>
           </div>

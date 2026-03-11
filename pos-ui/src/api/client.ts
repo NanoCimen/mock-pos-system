@@ -35,7 +35,7 @@ export interface Ticket {
   id: string;
   restaurant_id: string;
   mesa_id: string;
-  status: 'OPEN' | 'PARTIALLY_PAID' | 'PAID';
+  status: 'OPEN' | 'PARTIALLY_PAID' | 'PAID' | 'CLOSED';
   total_amount: number;
   currency: string;
   created_at: string;
@@ -73,6 +73,14 @@ export async function createTicket(restaurant_id: string, mesa_id: string): Prom
     mesa_id,
   });
   return data.data;
+}
+
+export async function closeTicket(ticketId: string): Promise<void> {
+  await api.post(`/tickets/${ticketId}/close`);
+}
+
+export async function deleteTicket(ticketId: string): Promise<void> {
+  await api.delete(`/tickets/${ticketId}`);
 }
 
 export async function addItems(

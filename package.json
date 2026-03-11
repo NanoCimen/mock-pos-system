@@ -9,6 +9,7 @@
     "db:seed": "tsx src/db/seed.ts",
     "db:reset": "npm run db:init && npm run db:seed",
     "db:migrate:tables": "tsx src/scripts/20260203_create_tables.ts",
+    "db:migrate:closed": "tsx src/scripts/20260311_add_closed_status_to_tickets.ts",
     "db:verify-railway": "tsx src/scripts/verify_railway_ticket.ts",
     "pos-ui:dev": "cd pos-ui && npm run dev",
     "pos-ui:build": "cd pos-ui && npm run build",

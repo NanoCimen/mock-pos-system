@@ -241,4 +241,63 @@ router.post('/', async (req: Request, res: Response) => {
   }
 });
 
+// POST /api/v1/tickets/:ticketId/close - Close a paid ticket (set status to CLOSED)
+router.post('/:ticketId/close', async (req: Request, res: Response) => {
+  try {
+    await simulateDelay();
+    if (shouldSimulateFailure()) {
+      return res.status(500).json({ success: false, error: 'Simulated server error' });
+    }
+    const { ticketId } = req.params;
+    const result = await pool.query(
+      'SELECT id, status FROM tickets WHERE tickets.id = $1',
+      [ticketId]
+    );
+    if (result.rows.length === 0) {
+      return res.status(404).json({ success: false, error: 'Ticket not found' });
+    }
+    const ticket = result.rows[0];
+    if (ticket.status !== 'PAID') {
+      return res.status(400).json({
+        success: false,
+        error: 'Only PAID tickets can be closed',
+      });
+    }
+    await pool.query(
+      'UPDATE tickets SET status = $1, updated_at = NOW() WHERE tickets.id = $2',
+      ['CLOSED', ticketId]
+    );
+    return res.json({ success: true, data: { id: ticketId, status: 'CLOSED' } });
+  } catch (error: any) {
+    console.error('Error closing ticket:', error);
+    return res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// DELETE /api/v1/tickets/:ticketId - Eliminate (delete) a ticket and its related rows
+router.delete('/:ticketId', async (req: Request, res: Response) => {
+  try {
+    await simulateDelay();
+    if (shouldSimulateFailure()) {
+      return res.status(500).json({ success: false, error: 'Simulated server error' });
+    }
+    const { ticketId } = req.params;
+    const result = await pool.query(
+      'SELECT id FROM tickets WHERE tickets.id = $1',
+      [ticketId]
+    );
+    if (result.rows.length === 0) {
+      return res.status(404).json({ success: false, error: 'Ticket not found' });
+    }
+    await pool.query('DELETE FROM payment_items WHERE payment_id IN (SELECT id FROM payments WHERE ticket_id = $1)', [ticketId]);
+    await pool.query('DELETE FROM payments WHERE ticket_id = $1', [ticketId]);
+    await pool.query('DELETE FROM ticket_items WHERE ticket_id = $1', [ticketId]);
+    await pool.query('DELETE FROM tickets WHERE id = $1', [ticketId]);
+    return res.status(200).json({ success: true });
+  } catch (error: any) {
+    console.error('Error deleting ticket:', error);
+    return res.status(500).json({ success: false, error: error.message });
+  }
+});
+
 export default router;

@@ -3,7 +3,7 @@ export interface Ticket {
   id: string; // UUID
   restaurant_id: string;
   mesa_id: string;
-  status: 'OPEN' | 'PARTIALLY_PAID' | 'PAID';
+  status: 'OPEN' | 'PARTIALLY_PAID' | 'PAID' | 'CLOSED';
   total_amount: number; // in DOP (whole units)
   currency: string;
   created_at: Date;

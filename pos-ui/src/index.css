@@ -102,6 +102,7 @@ body {
 .badge-open { background: #22c55e33; color: #22c55e; }
 .badge-partial { background: #eab30833; color: #eab308; }
 .badge-paid { background: #3b82f633; color: #60a5fa; }
+.badge-closed { background: #64748b33; color: #94a3b8; }
 
 .ticket-id-box {
   font-family: monospace;

@@ -88,6 +88,8 @@ export default function TableDetail() {
   function statusClass(s: string) {
     if (s === 'OPEN') return 'badge-open';
     if (s === 'PARTIALLY_PAID') return 'badge-partial';
+    if (s === 'PAID') return 'badge-paid';
+    if (s === 'CLOSED') return 'badge-closed';
     return 'badge-paid';
   }
 
