@@ -1,7 +1,9 @@
 import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { getTables, createTable, type PosTable } from '../api/client';
 
 export default function TablesView() {
+  const navigate = useNavigate();
   const [tables, setTables] = useState<PosTable[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -96,7 +98,15 @@ export default function TablesView() {
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '1rem' }}>
         {tables.map((t) => (
-          <div key={t.id} className="card">
+          <div
+            key={t.id}
+            className="card"
+            style={{ cursor: 'pointer' }}
+            onClick={() => navigate(`/tables/${encodeURIComponent(t.mesa_id)}`)}
+            onKeyDown={(e) => e.key === 'Enter' && navigate(`/tables/${encodeURIComponent(t.mesa_id)}`)}
+            role="button"
+            tabIndex={0}
+          >
             <div style={{ fontSize: '1.5rem', marginBottom: '0.5rem' }}>🪑</div>
             <h3 style={{ margin: '0 0 0.25rem' }}>{t.label}</h3>
             <p style={{ margin: 0, color: '#94a3b8', fontSize: '0.9rem' }}>

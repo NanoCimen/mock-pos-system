@@ -1,12 +1,17 @@
 import { useState, useEffect } from 'react';
+import { useParams, useNavigate } from 'react-router-dom';
 import { getTicket, addItems, removeItem, type Ticket } from '../api/client';
 
 interface TicketDetailProps {
-  ticketId: string;
-  onBack: () => void;
+  ticketId?: string;
+  onBack?: () => void;
 }
 
-export default function TicketDetail({ ticketId, onBack }: TicketDetailProps) {
+export default function TicketDetail({ ticketId: ticketIdProp, onBack }: TicketDetailProps) {
+  const { ticketId: ticketIdParam } = useParams<{ ticketId: string }>();
+  const navigate = useNavigate();
+  const ticketId = ticketIdProp ?? ticketIdParam ?? '';
+  const handleBack = onBack ?? (() => navigate('/tickets'));
   const [ticket, setTicket] = useState<Ticket | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -75,12 +80,13 @@ export default function TicketDetail({ ticketId, onBack }: TicketDetailProps) {
     return 'badge-paid';
   }
 
+  if (!ticketId) return <div className="error">Missing ticket ID</div>;
   if (loading) return <div className="loading">Loading ticket…</div>;
   if (!ticket) return <div className="error">{error || 'Ticket not found'}</div>;
 
   return (
     <div>
-      <button type="button" className="btn btn-secondary" onClick={onBack} style={{ marginBottom: '1rem' }}>
+      <button type="button" className="btn btn-secondary" onClick={handleBack} style={{ marginBottom: '1rem' }}>
         ← Back to tickets
       </button>
 

@@ -1,13 +1,15 @@
 import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { getTickets, createTicket, getTables, type Ticket, type PosTable } from '../api/client';
 
 const DEFAULT_RESTAURANT = 'test_restaurant';
 
 interface TicketsViewProps {
-  onSelectTicket: (ticketId: string) => void;
+  onSelectTicket?: (ticketId: string) => void;
 }
 
 export default function TicketsView({ onSelectTicket }: TicketsViewProps) {
+  const navigate = useNavigate();
   const [tickets, setTickets] = useState<Ticket[]>([]);
   const [tables, setTables] = useState<PosTable[]>([]);
   const [loading, setLoading] = useState(true);
@@ -45,7 +47,8 @@ export default function TicketsView({ onSelectTicket }: TicketsViewProps) {
       const ticket = await createTicket(DEFAULT_RESTAURANT, mesaId.trim());
       setShowCreate(false);
       await load();
-      onSelectTicket(ticket.id);
+      onSelectTicket?.(ticket.id);
+      navigate(`/tickets/${ticket.id}`);
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : 'Failed to create ticket');
     }
@@ -97,7 +100,10 @@ export default function TicketsView({ onSelectTicket }: TicketsViewProps) {
             key={t.id}
             className="card"
             style={{ cursor: 'pointer' }}
-            onClick={() => onSelectTicket(t.id)}
+            onClick={() => {
+              onSelectTicket?.(t.id);
+              navigate(`/tickets/${t.id}`);
+            }}
           >
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.5rem' }}>
               <div>

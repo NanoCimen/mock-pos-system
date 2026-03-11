@@ -26,7 +26,8 @@ body {
   margin-bottom: 1.5rem;
   flex-wrap: wrap;
 }
-.nav button {
+.nav button,
+.nav a {
   padding: 0.6rem 1rem;
   border: 1px solid #334155;
   background: #1e293b;
@@ -34,9 +35,12 @@ body {
   border-radius: 8px;
   cursor: pointer;
   font-size: 0.95rem;
+  text-decoration: none;
 }
-.nav button:hover { background: #334155; }
-.nav button.active { background: #3b82f6; border-color: #3b82f6; }
+.nav button:hover,
+.nav a:hover { background: #334155; }
+.nav button.active,
+.nav a.active { background: #3b82f6; border-color: #3b82f6; }
 
 .card {
   background: #1e293b;

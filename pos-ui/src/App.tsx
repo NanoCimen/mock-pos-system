@@ -1,14 +1,10 @@
-import { useState } from 'react';
+import { Routes, Route, NavLink } from 'react-router-dom';
 import TablesView from './components/TablesView';
+import TableDetail from './components/TableDetail';
 import TicketsView from './components/TicketsView';
 import TicketDetail from './components/TicketDetail';
 
-type Tab = 'tables' | 'tickets' | 'ticket';
-
 function App() {
-  const [activeTab, setActiveTab] = useState<Tab>('tables');
-  const [selectedTicketId, setSelectedTicketId] = useState<string | null>(null);
-
   return (
     <div className="app">
       <header className="header">
@@ -17,44 +13,22 @@ function App() {
       </header>
 
       <nav className="nav">
-        <button
-          className={activeTab === 'tables' ? 'active' : ''}
-          onClick={() => { setActiveTab('tables'); setSelectedTicketId(null); }}
-        >
+        <NavLink to="/tables" className={({ isActive }) => (isActive ? 'active' : '')}>
           Tables
-        </button>
-        <button
-          className={activeTab === 'tickets' ? 'active' : ''}
-          onClick={() => { setActiveTab('tickets'); setSelectedTicketId(null); }}
-        >
+        </NavLink>
+        <NavLink to="/tickets" className={({ isActive }) => (isActive ? 'active' : '')}>
           Tickets
-        </button>
-        {selectedTicketId && (
-          <button
-            className={activeTab === 'ticket' ? 'active' : ''}
-            onClick={() => setActiveTab('ticket')}
-          >
-            Ticket
-          </button>
-        )}
+        </NavLink>
       </nav>
 
       <main>
-        {activeTab === 'tables' && <TablesView />}
-        {activeTab === 'tickets' && (
-          <TicketsView
-            onSelectTicket={(id) => {
-              setSelectedTicketId(id);
-              setActiveTab('ticket');
-            }}
-          />
-        )}
-        {activeTab === 'ticket' && selectedTicketId && (
-          <TicketDetail
-            ticketId={selectedTicketId}
-            onBack={() => { setActiveTab('tickets'); setSelectedTicketId(null); }}
-          />
-        )}
+        <Routes>
+          <Route path="/" element={<TablesView />} />
+          <Route path="/tables" element={<TablesView />} />
+          <Route path="/tables/:mesa_id" element={<TableDetail />} />
+          <Route path="/tickets" element={<TicketsView />} />
+          <Route path="/tickets/:ticketId" element={<TicketDetail />} />
+        </Routes>
       </main>
     </div>
   );

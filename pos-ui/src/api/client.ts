@@ -89,3 +89,11 @@ export async function addItems(
 export async function removeItem(itemId: string): Promise<void> {
   await api.delete(`/items/${itemId}`);
 }
+
+export async function updateItemQuantity(itemId: string, quantity: number): Promise<TicketItem | null> {
+  const { data } = await api.patch<{ success: boolean; data: TicketItem | null; deleted?: boolean }>(
+    `/items/${itemId}`,
+    { quantity }
+  );
+  return data.data ?? null;
+}

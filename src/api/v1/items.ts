@@ -269,102 +269,96 @@ router.delete('/:itemId', async (req: Request, res: Response) => {
   }
 });
 
-// PATCH /api/v1/items/:itemId - Update an item (notes only - paid_amount managed via payments)
+// PATCH /api/v1/items/:itemId - Update item (quantity or notes)
 router.patch('/:itemId', async (req: Request, res: Response) => {
   try {
     await simulateDelay();
-    
     if (shouldSimulateFailure()) {
-      return res.status(500).json({
-        success: false,
-        error: 'Simulated server error',
-      });
+      return res.status(500).json({ success: false, error: 'Simulated server error' });
     }
 
     const { itemId } = req.params;
-    const { notes } = req.body as { notes?: string };
+    const body = req.body as { quantity?: number; notes?: string };
 
-    // Get item
     const itemResult = await pool.query(
-      `SELECT 
-        ticket_items.id,
-        ticket_items.ticket_id,
-        ticket_items.name,
-        ticket_items.price,
-        ticket_items.quantity,
-        ticket_items.paid_amount,
-        ticket_items.created_at
-      FROM ticket_items 
-      WHERE ticket_items.id = $1`,
+      `SELECT id, ticket_id, name, price, quantity, paid_amount, created_at
+       FROM ticket_items WHERE ticket_items.id = $1`,
       [itemId]
     );
-
     if (itemResult.rows.length === 0) {
-      return res.status(404).json({
-        success: false,
-        error: 'Item not found',
-      });
+      return res.status(404).json({ success: false, error: 'Item not found' });
     }
-
     const item = itemResult.rows[0];
 
-    // Verify ticket is not cancelled
     const ticketResult = await pool.query(
       'SELECT * FROM tickets WHERE tickets.id = $1',
       [item.ticket_id]
     );
-
     if (ticketResult.rows.length === 0) {
-      return res.status(404).json({
-        success: false,
-        error: 'Ticket not found',
-      });
+      return res.status(404).json({ success: false, error: 'Ticket not found' });
     }
-
     const ticket = ticketResult.rows[0];
     if (ticket.status === 'CANCELLED') {
-      return res.status(400).json({
-        success: false,
-        error: 'Cannot update items on a cancelled ticket',
-      });
+      return res.status(400).json({ success: false, error: 'Cannot update items on a cancelled ticket' });
+    }
+    if (ticket.status === 'PAID') {
+      return res.status(400).json({ success: false, error: 'Cannot update items on a paid ticket' });
     }
 
-    // Only allow updating notes (paid_amount is managed via payments endpoint)
-    if (notes === undefined) {
-      return res.status(400).json({
-        success: false,
-        error: 'Only notes field can be updated',
-      });
+    let newQuantity = item.quantity;
+    if (typeof body.quantity === 'number' && body.quantity >= 0) {
+      newQuantity = Math.max(0, Math.floor(body.quantity));
+      if (newQuantity === 0) {
+        await pool.query('DELETE FROM ticket_items WHERE ticket_items.id = $1', [itemId]);
+        const sumResult = await pool.query(
+          `SELECT COALESCE(SUM(ticket_items.price * ticket_items.quantity), 0)::integer AS total
+           FROM ticket_items WHERE ticket_items.ticket_id = $1`,
+          [item.ticket_id]
+        );
+        await pool.query(
+          'UPDATE tickets SET total_amount = $1, updated_at = NOW() WHERE tickets.id = $2',
+          [sumResult.rows[0].total, item.ticket_id]
+        );
+        return res.json({ success: true, data: null, deleted: true });
+      }
+      await pool.query(
+        'UPDATE ticket_items SET quantity = $1 WHERE ticket_items.id = $2',
+        [newQuantity, itemId]
+      );
     }
 
-    // Note: In the new schema, ticket_items doesn't have a notes column
-    // If you need notes, you'd need to add it to the schema
-    // For now, just return the item as-is
-    
-    const paidAmount = item.paid_amount || 0;
-    const itemTotalPrice = item.price * item.quantity;
-    
+    const sumResult = await pool.query(
+      `SELECT COALESCE(SUM(ticket_items.price * ticket_items.quantity), 0)::integer AS total
+       FROM ticket_items WHERE ticket_items.ticket_id = $1`,
+      [item.ticket_id]
+    );
+    await pool.query(
+      'UPDATE tickets SET total_amount = $1, updated_at = NOW() WHERE tickets.id = $2',
+      [sumResult.rows[0].total, item.ticket_id]
+    );
+
+    const updatedResult = await pool.query(
+      `SELECT id, ticket_id, name, price, quantity, paid_amount, created_at
+       FROM ticket_items WHERE ticket_items.id = $1`,
+      [itemId]
+    );
+    const row = updatedResult.rows[0];
+    const paidAmount = row.paid_amount || 0;
     const updatedItem: TicketItem = {
-      id: item.id,
-      ticket_id: item.ticket_id,
-      name: item.name,
-      price: item.price,
-      quantity: item.quantity,
+      id: row.id,
+      ticket_id: row.ticket_id,
+      name: row.name,
+      price: row.price,
+      quantity: row.quantity,
       paid_amount: paidAmount,
-      is_paid: paidAmount >= itemTotalPrice,
-      created_at: item.created_at,
+      is_paid: paidAmount >= row.price * row.quantity,
+      created_at: row.created_at,
     };
 
-    return res.json({
-      success: true,
-      data: updatedItem,
-    });
+    return res.json({ success: true, data: updatedItem });
   } catch (error: any) {
     console.error('Error updating item:', error);
-    return res.status(500).json({
-      success: false,
-      error: error.message,
-    });
+    return res.status(500).json({ success: false, error: error.message });
   }
 });
 
