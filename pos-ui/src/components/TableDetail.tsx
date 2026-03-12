@@ -5,6 +5,7 @@ import {
   getTickets,
   getTicket,
   createTicket,
+  closeMesa,
   type PosTable,
   type Ticket,
 } from '../api/client';
@@ -21,6 +22,7 @@ export default function TableDetail() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
+  const [closing, setClosing] = useState(false);
   const [copied, setCopied] = useState(false);
 
   async function loadTable() {
@@ -85,6 +87,21 @@ export default function TableDetail() {
     setTimeout(() => setCopied(false), 2000);
   }
 
+  async function handleCloseMesa() {
+    if (!mesa_id || !ticket) return;
+    if (!confirm('Close this mesa? The ticket will be closed and logged. You can then start a new ticket.')) return;
+    setError(null);
+    setClosing(true);
+    try {
+      await closeMesa(mesa_id);
+      setTicket(null);
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : 'Failed to close mesa');
+    } finally {
+      setClosing(false);
+    }
+  }
+
   function statusClass(s: string) {
     if (s === 'OPEN') return 'badge-open';
     if (s === 'PARTIALLY_PAID') return 'badge-partial';
@@ -143,9 +160,19 @@ export default function TableDetail() {
                   Ticket ID: <code style={{ wordBreak: 'break-all' }}>{ticket.id}</code>
                 </span>
               </div>
-              <button type="button" className="btn btn-success" onClick={copyTicketId}>
-                {copied ? 'Copied!' : 'Copy Ticket ID'}
-              </button>
+              <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+                <button type="button" className="btn btn-success" onClick={copyTicketId}>
+                  {copied ? 'Copied!' : 'Copy Ticket ID'}
+                </button>
+                <button
+                  type="button"
+                  className="btn btn-secondary"
+                  disabled={closing}
+                  onClick={handleCloseMesa}
+                >
+                  {closing ? 'Closing…' : 'Close mesa'}
+                </button>
+              </div>
             </div>
             <p style={{ margin: '0.5rem 0 0', fontSize: '0.9rem', color: '#94a3b8' }}>
               Created: {new Date(ticket.created_at).toLocaleString()}

@@ -122,3 +122,27 @@ export async function updateItemQuantity(itemId: string, quantity: number): Prom
   );
   return data.data ?? null;
 }
+
+export interface MesaCloseLog {
+  id: string;
+  mesa_id: string;
+  ticket_id: string;
+  total_amount: number;
+  currency: string;
+  items_summary: { name: string; price: number; quantity: number }[];
+  closed_at: string;
+}
+
+export async function closeMesa(mesa_id: string): Promise<MesaCloseLog> {
+  const { data } = await api.post<{ success: boolean; data: MesaCloseLog }>('/tables/close-mesa', {
+    mesa_id,
+  });
+  return data.data;
+}
+
+export async function getCloseLogs(limit?: number): Promise<MesaCloseLog[]> {
+  const { data } = await api.get<{ success: boolean; data: MesaCloseLog[] }>('/tables/close-logs', {
+    params: limit != null ? { limit } : undefined,
+  });
+  return data.data;
+}

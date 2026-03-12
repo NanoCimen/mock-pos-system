@@ -70,6 +70,97 @@ router.post('/', async (req: Request, res: Response) => {
   }
 });
 
+export interface MesaCloseLog {
+  id: string;
+  mesa_id: string;
+  ticket_id: string;
+  total_amount: number;
+  currency: string;
+  items_summary: { name: string; price: number; quantity: number }[];
+  closed_at: Date;
+}
+
+// POST /api/v1/tables/close-mesa - Close mesa (log ticket + set CLOSED so mesa can restart)
+router.post('/close-mesa', async (req: Request, res: Response) => {
+  try {
+    await simulateDelay();
+    if (shouldSimulateFailure()) {
+      return res.status(500).json({ success: false, error: 'Simulated server error' });
+    }
+    const body = req.body as { mesa_id?: string; mesaId?: string };
+    const mesa_id = (body.mesa_id ?? body.mesaId ?? '').trim();
+    if (!mesa_id) {
+      return res.status(400).json({ success: false, error: 'mesa_id is required' });
+    }
+    const tickets = await pool.query(
+      `SELECT id, total_amount, currency FROM tickets WHERE mesa_id = $1 AND status IN ('OPEN', 'PARTIALLY_PAID', 'PAID') ORDER BY created_at DESC LIMIT 1`,
+      [mesa_id]
+    );
+    if (tickets.rows.length === 0) {
+      return res.status(400).json({ success: false, error: 'No active ticket to close for this mesa' });
+    }
+    const ticket = tickets.rows[0];
+    const items = await pool.query(
+      `SELECT name, price, quantity FROM ticket_items WHERE ticket_id = $1 ORDER BY created_at`,
+      [ticket.id]
+    );
+    const items_summary = items.rows.map((r: any) => ({ name: r.name, price: r.price, quantity: r.quantity }));
+    const logResult = await pool.query(
+      `INSERT INTO mesa_close_logs (mesa_id, ticket_id, total_amount, currency, items_summary)
+       VALUES ($1, $2, $3, $4, $5)
+       RETURNING id, mesa_id, ticket_id, total_amount, currency, items_summary, closed_at`,
+      [mesa_id, ticket.id, ticket.total_amount, ticket.currency || 'DOP', JSON.stringify(items_summary)]
+    );
+    await pool.query(
+      `UPDATE tickets SET status = 'CLOSED', updated_at = NOW() WHERE id = $1`,
+      [ticket.id]
+    );
+    const row = logResult.rows[0];
+    const log: MesaCloseLog = {
+      id: row.id,
+      mesa_id: row.mesa_id,
+      ticket_id: row.ticket_id,
+      total_amount: row.total_amount,
+      currency: row.currency,
+      items_summary: typeof row.items_summary === 'string' ? JSON.parse(row.items_summary) : row.items_summary,
+      closed_at: row.closed_at,
+    };
+    return res.json({ success: true, data: log });
+  } catch (error: any) {
+    console.error('Error closing mesa:', error);
+    return res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// GET /api/v1/tables/close-logs - List recent closed mesas (for logs section)
+router.get('/close-logs', async (req: Request, res: Response) => {
+  try {
+    await simulateDelay();
+    if (shouldSimulateFailure()) {
+      return res.status(500).json({ success: false, error: 'Simulated server error' });
+    }
+    const limit = Math.min(100, parseInt(String(req.query.limit || 50), 10) || 50);
+    const result = await pool.query(
+      `SELECT id, mesa_id, ticket_id, total_amount, currency, items_summary, closed_at
+       FROM mesa_close_logs ORDER BY closed_at DESC LIMIT $1`,
+      [limit]
+    );
+    const logs: MesaCloseLog[] = result.rows.map((row: any) => ({
+      id: row.id,
+      mesa_id: row.mesa_id,
+      ticket_id: row.ticket_id,
+      total_amount: row.total_amount,
+      currency: row.currency,
+      items_summary: typeof row.items_summary === 'string' ? JSON.parse(row.items_summary) : (row.items_summary || []),
+      closed_at: row.closed_at,
+    }));
+    return res.json({ success: true, data: logs });
+  } catch (error: any) {
+    console.error('Error fetching close logs:', error);
+    return res.status(500).json({ success: false, error: error.message });
+  }
+});
+
 // GET /api/v1/tables/:id - Get one table by id
 router.get('/:id', async (req: Request, res: Response) => {
   try {

@@ -3,6 +3,7 @@ import TablesView from './components/TablesView';
 import TableDetail from './components/TableDetail';
 import TicketsView from './components/TicketsView';
 import TicketDetail from './components/TicketDetail';
+import CloseLogsView from './components/CloseLogsView';
 
 function App() {
   return (
@@ -19,6 +20,9 @@ function App() {
         <NavLink to="/tickets" className={({ isActive }) => (isActive ? 'active' : '')}>
           Tickets
         </NavLink>
+        <NavLink to="/logs" className={({ isActive }) => (isActive ? 'active' : '')}>
+          Logs
+        </NavLink>
       </nav>
 
       <main>
@@ -28,6 +32,7 @@ function App() {
           <Route path="/tables/:mesa_id" element={<TableDetail />} />
           <Route path="/tickets" element={<TicketsView />} />
           <Route path="/tickets/:ticketId" element={<TicketDetail />} />
+          <Route path="/logs" element={<CloseLogsView />} />
         </Routes>
       </main>
     </div>
